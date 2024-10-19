@@ -35,7 +35,6 @@ async function downloadAllImages(selId, tabId){
             if(!elementsByTagName.length){
                 let elementsByClassNameElement = document.getElementsByClassName('FlatButton--primary');
                 if(elementsByClassNameElement){
-                    console.log(elementsByClassNameElement.length);
                     if(elementsByClassNameElement.length){
                         elementsByClassNameElement[0].click()
                     }
@@ -63,7 +62,6 @@ async function downloadAllImages(selId, tabId){
                     a.setAttribute('href', URL.createObjectURL(blob));
                     a.setAttribute('download', name);
                     a.click();
-                    console.log('я был здесь')
                 }
             }
             sendMsgToBackground('removeTab', {tabId: tabId})
@@ -84,8 +82,7 @@ function removeTab(tabId){
 
 
 async function sendMsgToBackground(method, params){
-    const response = await chrome.runtime.sendMessage({method: method, params: params});
-    console.log(response);
+    await chrome.runtime.sendMessage({method: method, params: params});
 }
 
 

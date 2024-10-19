@@ -37,7 +37,7 @@ function createDownloadBtnInDlg(withoutCheck){
             button.id = "dwnld"
 
             let span = document.createElement("span");
-            span.style = "position: relative; top: 4px; padding-right: 5px;"
+            span.style = "position: relative; top: 5px; padding-right: 5px;"
             span.innerText = "Скачать фотки";
 
             let voronaImg = document.createElement("img");
@@ -74,61 +74,90 @@ async function onClickDownload(){
     if(selectedMessages?.length){
         for (let i = 0; i < selectedMessages.length; i++) {
             let selectedMessage = selectedMessages[i];
-            let element;
-            element = searchPhotoLink(selectedMessage);
-            if(!element){
-                element = searchPhotoLink(selectedMessage, 'page_post_thumb_unsized');
+            let elements;
+            elements = searchPhotoLink(selectedMessage);
+            if(!elements.length){
+                elements = searchPhotoLink(selectedMessage, 'page_post_thumb_unsized');
             }
-            if(element){
-                links.push(element.href);
+            if(elements.length){
+                for (let j = 0; j < elements.length; j++) {
+                    links.push(elements[j].href);
+                }
             } else {
-                element = searchPhotoLink(selectedMessage, 'page_post_thumb_wrap');
-                if(element){
-                    let link = element.style.backgroundImage;
-                    console.log(link)
-                    if(link){
-                        link = link.substring(5, link.length - 2);
+                elements = searchPhotoLink(selectedMessage, 'page_post_thumb_wrap');
+                if(elements.length){
+                    for (let j = 0; j < elements.length; j++) {
+                        let el = elements[j];
+                        let link = getMaxSizeLinkFromOnClick(el);
+                        if(link){
+                            links.push(link);
+                        }
                     }
-                    links.push(link);
                 }
             }
-
-
         }
     }
     for (const link of links) {
         await sendMsgToBackground('openAndDo', {link: link, selId})
     }
-
-
-    console.log(links.length);
 }
 
-function searchPhotoLink(element, className){
-    let element1 = className ? element.getElementsByClassName(className) : element.getElementsByTagName('a');
-    if(element1){
-        element1 = element1[0];
-        if(!className && element1?.innerText !== 'Посмотреть все изображения'){
-            element1 = null;
-        }
-        if(className && (!element1?.classList?.contains(className) || element1?.tagName.toLowerCase() !== 'a')){
-            element1 = null;
-        }
-    }
+function searchPhotoLink(rootElement, className, acc){
+    acc = acc ? acc : [];
 
-    if (!element1 && element.children != null){
-        for(let i= 0; i < element.children.length; i++){
-            element1 = searchPhotoLink(element.children[i], className);
-            if(element1) break;
+    let elements = className ? rootElement.getElementsByClassName(className) : rootElement.getElementsByTagName('a');
+    if(elements?.length){
+        for (let i = 0; i < elements.length; i++) {
+            let element = elements[i];
+            if(!className){
+                if(element?.innerText !== 'Посмотреть все изображения' || !isMatchContext(element.href)){
+                    element = null;
+                } else {
+                    acc.push(element);
+                    break;
+                }
+            } else {
+                if(!element?.classList?.contains(className) || element?.tagName.toLowerCase() !== 'a'){
+                    element = null;
+                } else {
+                    acc.push(element);
+                }
+            }
         }
     }
-    return element1;
+    return acc;
 }
 
 
 async function sendMsgToBackground(method, params){
-    const response = await chrome.runtime.sendMessage({method: method, params: params});
-    console.log(response);
+    await chrome.runtime.sendMessage({method: method, params: params});
+}
+
+function isMatchContext(elHref){
+    let href = window.location.href;
+    if(!elHref?.includes('gim') || !href?.includes('gim')){
+        return false;
+    }
+    return getGimId(href) === getGimId(elHref);
+}
+
+function getGimId(href){
+    let start = href.indexOf('gim');
+    href = href.substring(start);
+    let end = href.indexOf('?');
+    if(end === -1){
+        end = href.length;
+    }
+    return href.substring(0, end);
+}
+
+function getMaxSizeLinkFromOnClick(element){
+    let textCon = element.attributes.onclick.textContent;
+    textCon = textCon.substring(textCon.lastIndexOf('https'));
+    textCon = textCon.substring(0, textCon.indexOf('"'));
+    textCon = textCon.replaceAll('\\', '');
+    return textCon;
+
 }
 
 
