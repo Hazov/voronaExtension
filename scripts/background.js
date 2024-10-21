@@ -4,33 +4,34 @@ chrome.runtime.onMessage.addListener(
             openAndDo(request.params);
         } else if(request.method === 'removeTab'){
             removeTab(request.params.tabId);
+        } else if(request.method === 'downloadLink'){
+            downloadFile(request.params);
         }
 
     }
 );
 
+async function downloadFile(params){
+    window.onload = async function(){
+        await chrome.downloads.download(params)
+    }
+}
+
 async function openAndDo(params){
     let newTab = await chrome.tabs.create({url: params.link, active: false, pinned: true});
-    chrome.scripting
-        .executeScript({
+    chrome.scripting.executeScript({
             target : {tabId : newTab.id},
             func : downloadAllImages,
             args : [params.selId, newTab.id]
         })
-        .then(injectionResults => {
-            setTimeout(() => {
-                if(newTab){
-                    removeTab(newTab.id)
-                }
-            }, 10000)
-        });
+        .then(injectionResults => {});
 }
 
 
 async function downloadAllImages(selId, tabId){
-
+    let date = getDate();
     try{
-        setTimeout(async () => {
+        window.onload = async function(){
             let elementsByTagName = document.querySelectorAll('img');
             if(!elementsByTagName.length){
                 let elementsByClassNameElement = document.getElementsByClassName('FlatButton--primary');
@@ -55,34 +56,29 @@ async function downloadAllImages(selId, tabId){
                     let name = src.substring(start, end === -1 ? undefined : end);
                     name = name.replace(/[^a-zA-Z0-9]+/g, '-');
                     name += '.' + mimeType.substring(mimeType.lastIndexOf('/') + 1);
-                    name = selId + '__' + name;
-
-                    // Download the blob using a <a> element.
-                    const a = document.createElement('a');
-                    a.setAttribute('href', URL.createObjectURL(blob));
-                    a.setAttribute('download', name);
-                    a.click();
+                    name = selId + '__' + date + '\\' + name
+                    await chrome.runtime.sendMessage({method: 'downloadLink', params: {url: URL.createObjectURL(blob), filename: name}})
                 }
             }
-            sendMsgToBackground('removeTab', {tabId: tabId})
-        }, 5000)
+            await chrome.runtime.sendMessage({method: 'removeTab', params: {tabId: tabId}});
+        }
     } catch (e){
-        sendMsgToBackground('removeTab', {tabId: tabId})
+        await chrome.runtime.sendMessage({method: 'removeTab', params: {tabId: tabId}});
 
     }
     return resp;
 }
 
 function removeTab(tabId){
-    setTimeout(() => {
-        chrome.tabs.remove(tabId)
-    }, 3000)
-
+    chrome.tabs.remove(tabId);
 }
 
-
-async function sendMsgToBackground(method, params){
-    await chrome.runtime.sendMessage({method: method, params: params});
+function getDate(){
+    let date = new Date();
+    let year = new Intl.DateTimeFormat('en', { year: 'numeric' }).format(date);
+    let month = new Intl.DateTimeFormat('en', { month: '2-digit' }).format(date);
+    let day = new Intl.DateTimeFormat('en', { day: '2-digit' }).format(date);
+    return day + '_' + month + "_" + year;
 }
 
 

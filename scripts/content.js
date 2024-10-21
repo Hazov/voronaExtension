@@ -129,9 +129,7 @@ function searchPhotoLink(rootElement, className, acc){
 }
 
 
-async function sendMsgToBackground(method, params){
-    await chrome.runtime.sendMessage({method: method, params: params});
-}
+
 
 function isMatchContext(elHref){
     let href = window.location.href;
@@ -157,7 +155,10 @@ function getMaxSizeLinkFromOnClick(element){
     textCon = textCon.substring(0, textCon.indexOf('"'));
     textCon = textCon.replaceAll('\\', '');
     return textCon;
+}
 
+async function sendMsgToBackground(method, params){
+    await chrome.runtime.sendMessage({method: method, params: params});
 }
 
 
