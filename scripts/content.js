@@ -98,7 +98,7 @@ async function onClickDownload(){
         }
     }
     for (const link of links) {
-        await sendMsgToBackground('openAndDo', {link: link, selId})
+        await sendMsgToBackground('openAndDo', {link: link, selId: selId})
     }
 }
 

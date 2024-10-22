@@ -27,6 +27,18 @@ async function openAndDo(params){
 
 
 async function downloadAllImages(selId, tabId){
+    window.removeTabTask = async function(isSingleDoc){
+        if(isSingleDoc){
+            setTimeout(() => {
+                chrome.runtime.sendMessage({method: 'removeTab', params: {tabId: tabId}});
+            }, 5000)
+        } else {
+            await chrome.runtime.sendMessage({method: 'removeTab', params: {tabId: tabId}});
+        }
+    }
+
+
+    let isSingleDoc = false;
     // let date = getDate();
     try{
         window.onload = async function(){
@@ -35,6 +47,7 @@ async function downloadAllImages(selId, tabId){
                 let elementsByClassNameElement = document.getElementsByClassName('FlatButton--primary');
                 if(elementsByClassNameElement){
                     if(elementsByClassNameElement.length){
+                        isSingleDoc = true;
                         elementsByClassNameElement[0].click()
                     }
                 }
@@ -55,15 +68,14 @@ async function downloadAllImages(selId, tabId){
                     name = name.replace(/[^a-zA-Z0-9]+/g, '-');
                     name += '.' + mimeType.substring(mimeType.lastIndexOf('/') + 1);
                     // name = selId + '__' + date + '\\' + name
-                    name = selId + '__' + name
+                    name = selId + '__' + name;
                     await chrome.runtime.sendMessage({method: 'downloadLink', params: {url: URL.createObjectURL(blob), filename: name}})
                 }
             }
-            await chrome.runtime.sendMessage({method: 'removeTab', params: {tabId: tabId}});
+            await window.removeTabTask(isSingleDoc);
         }
     } catch (e){
-        await chrome.runtime.sendMessage({method: 'removeTab', params: {tabId: tabId}});
-
+        await window.removeTabTask(isSingleDoc);
     }
     return resp;
 }
