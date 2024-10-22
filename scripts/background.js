@@ -12,9 +12,7 @@ chrome.runtime.onMessage.addListener(
 );
 
 async function downloadFile(params){
-    window.onload = async function(){
-        await chrome.downloads.download(params)
-    }
+    await chrome.downloads.download(params)
 }
 
 async function openAndDo(params){
@@ -29,7 +27,7 @@ async function openAndDo(params){
 
 
 async function downloadAllImages(selId, tabId){
-    let date = getDate();
+    // let date = getDate();
     try{
         window.onload = async function(){
             let elementsByTagName = document.querySelectorAll('img');
@@ -56,7 +54,8 @@ async function downloadAllImages(selId, tabId){
                     let name = src.substring(start, end === -1 ? undefined : end);
                     name = name.replace(/[^a-zA-Z0-9]+/g, '-');
                     name += '.' + mimeType.substring(mimeType.lastIndexOf('/') + 1);
-                    name = selId + '__' + date + '\\' + name
+                    // name = selId + '__' + date + '\\' + name
+                    name = selId + '__' + name
                     await chrome.runtime.sendMessage({method: 'downloadLink', params: {url: URL.createObjectURL(blob), filename: name}})
                 }
             }
