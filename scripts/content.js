@@ -17,7 +17,7 @@ $(document).on('scroll', () => {
 })
 
 
-function createDownloadBtnInDlg(withoutCheck){
+function createDownloadBtnInDlg(){
     if(!document.getElementById('dwnld')){
         let peerInfo = document.getElementsByClassName("PeerProfile__container");
         if(peerInfo && peerInfo[0]){
@@ -58,85 +58,72 @@ function createDownloadBtnInDlg(withoutCheck){
 }
 
 async function onClickDownload(){
+    let selId = getSelId();
+    let links = [];
+    let selectedMessages = document.getElementsByClassName("im-mess_selected");
+    for (let i = 0; i < selectedMessages.length; i++) {
+        links.push(...searchPhotoLinks(selectedMessages[i]));
+    }
+    await sendMsgToBackground('openAndDo', {links: links, selId: selId})
+}
+
+function getSelId(){
     let selId =  document.getElementsByClassName('ui_rmenu_item_sel');
     if(selId && selId[0] && selId[0].title){
-        selId = selId[0].title
+        return selId[0].title
     } else {
         selId = window.location.href;
         selId = selId.substring(selId.indexOf('sel=') + 4);
         if(selId.indexOf('&') !== -1){
-            selId = selId.substring(0, selId.indexOf('&'));
+            return selId.substring(0, selId.indexOf('&'));
         }
     }
+    return 'undefined'
+}
 
+function searchPhotoLinks(messElement){
     let links = [];
-    let selectedMessages = document.getElementsByClassName("im-mess_selected");
-    if(selectedMessages?.length){
-        for (let i = 0; i < selectedMessages.length; i++) {
-            let selectedMessage = selectedMessages[i];
-            let elements;
-            elements = searchPhotoLink(selectedMessage);
-            if(!elements.length){
-                elements = searchPhotoLink(selectedMessage, 'page_post_thumb_unsized');
-            }
-            if(elements.length){
-                for (let j = 0; j < elements.length; j++) {
-                    links.push(elements[j].href);
-                }
-            } else {
-                elements = searchPhotoLink(selectedMessage, 'page_post_thumb_wrap');
-                if(elements.length){
-                    for (let j = 0; j < elements.length; j++) {
-                        let el = elements[j];
-                        let link = getMaxSizeLinkFromOnClick(el);
-                        if(link){
-                            links.push(link);
-                        }
-                    }
-                }
+    links.push(...getSimpleLinks(messElement));
+    links.push(...getForwardedLinks(messElement));
+    return links;
+}
+
+function getSimpleLinks(messElement){
+    let links = [];
+    let gimId = getGimId(window.location.href)
+    //Обычные сообщения
+    let messId;
+    let classWithMessId = messElement.classList.values()
+        .filter(f => typeof f === 'string')
+        .find(className => className.search(/\d/) !== -1);
+    if(classWithMessId){
+        messId = classWithMessId.replaceAll(/\D/g, '');
+    }
+    if(messId){
+        let link = 'https://vk.com/' + gimId + '?act=browse_images&id=' + messId;
+        if(link){
+            links.push({href: link, isDoc: false});
+        }
+    }
+    return links;
+}
+
+function getForwardedLinks(messElement){
+    let links = [];
+    let fwdMessages = messElement.getElementsByClassName('im-mess--inline-fwd');
+    for (let i = 0; i < fwdMessages.length; i++) {
+        let mess = fwdMessages[i];
+        let hrefs = mess.getElementsByTagName('a');
+        for (let j = 0; j < hrefs.length; j++) {
+            let a = hrefs[j];
+            if(a.classList.toString().includes('page_post_thumb_wrap')){
+                links.push({href: getMaxSizeLinkFromOnClick(a), isDoc: false});
+            } else if(a.classList.toString().includes('page_post_thumb_unsized')){
+                links.push({href: a.href, isDoc: true});
             }
         }
     }
-    for (const link of links) {
-        await sendMsgToBackground('openAndDo', {link: link, selId: selId})
-    }
-}
-
-function searchPhotoLink(rootElement, className, acc){
-    acc = acc ? acc : [];
-
-    let elements = className ? rootElement.getElementsByClassName(className) : rootElement.getElementsByTagName('a');
-    if(elements?.length){
-        for (let i = 0; i < elements.length; i++) {
-            let element = elements[i];
-            if(!className){
-                if(element?.innerText !== 'Посмотреть все изображения' || !isMatchContext(element.href)){
-                    element = null;
-                } else {
-                    acc.push(element);
-                    break;
-                }
-            } else {
-                if(!element?.classList?.contains(className) || element?.tagName.toLowerCase() !== 'a'){
-                    element = null;
-                } else {
-                    acc.push(element);
-                }
-            }
-        }
-    }
-    return acc;
-}
-
-
-
-
-function isMatchContext(elHref){
-    let href = window.location.href;
-    if(!elHref?.includes('gim') || !href?.includes('gim')){
-        return false;
-    }
-    return getGimId(href) === getGimId(elHref);
+    return links;
 }
 
 function getGimId(href){
