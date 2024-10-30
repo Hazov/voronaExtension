@@ -1,5 +1,5 @@
 
-let fwdDocs = [];
+let filesToDownload = [];
 
 chrome.runtime.onMessage.addListener(
      function(request, sender, sendResponse) {
@@ -22,19 +22,26 @@ chrome.downloads.onDeterminingFilename.addListener(function(item, __suggest) {
             conflictAction: conflictAction,
             conflict_action: conflictAction});
     }
-    if(fwdDocs.length){
-        let found = fwdDocs.find(ff => ff.fileName === item.filename);
+    if(filesToDownload.length){
+        let found = filesToDownload.find(ff => ff.fileName && ff.fileName === item.filename);
+        found = found ? found : filesToDownload.find(ff => ff.size && ff.size === item.fileSize);
         if(found){
-            let idx = fwdDocs.indexOf(found);
-            fwdDocs.splice(idx, 1);
+            let idx = filesToDownload.indexOf(found);
+            if(found.fileName){
+                try{
+                    removeTab(found.tabId);
+                } catch (e){
+
+                }
+            }
+            filesToDownload.splice(idx, 1);
             suggest(found.fName + '\\' + item.filename, 'uniquify');
-            return;
         }
     }
-    suggest(item.fileName, item.conflictAction);
 });
 
 async function downloadFile(params){
+    params.filename = params.filename.replaceAll(/\s/g, '');
     await chrome.downloads.download(params)
 }
 
@@ -53,13 +60,13 @@ async function openAndDo(params){
 }
 
 function waitFwdDoc(fwdDoc){
-    fwdDocs.push(fwdDoc);
+    filesToDownload.push(fwdDoc);
 }
 
 
 async function downloadAllImages(selId, tabId, isDoc, date){
 
-    let fName = selId + '__' + date;
+    let folderName = selId + '__' + date;
     try{
         window.onload = async function(){
             if(!isDoc){
@@ -79,18 +86,23 @@ async function downloadAllImages(selId, tabId, isDoc, date){
                     name = name.replace(/[^a-zA-Z0-9]+/g, '-');
                     name += '.' + mimeType.substring(mimeType.lastIndexOf('/') + 1);
                     let ext = name.substring(name.lastIndexOf('.'));
-                    name = fName + '\\' + name.substring(0, 10) + ext;
-                    await chrome.runtime.sendMessage({method: 'downloadLink', params: {url: URL.createObjectURL(blob), filename: name, conflictAction: 'uniquify'}})
+                    name = folderName + '\\' + name.substring(0, 10) + ext;
+                    let link = URL.createObjectURL(blob);
+                    await chrome.runtime.sendMessage({method: 'waitFwdDoc', params: {size: blob.size, tabId: tabId, fName: folderName}});
+                    await chrome.runtime.sendMessage({method: 'downloadLink', params: {url: URL.createObjectURL(blob), filename: name}});
                 }
                 await chrome.runtime.sendMessage({method: 'removeTab', params: {tabId: tabId}});
             } else {
                 let fileName = document.getElementsByClassName('docs_panel_name')[0].children[0].innerHTML;
-                await chrome.runtime.sendMessage({method: 'waitFwdDoc', params: {fileName: fileName, fName: fName, tabId: tabId}});
+                await chrome.runtime.sendMessage({method: 'waitFwdDoc', params: {fileName: fileName, tabId: tabId, fName: folderName}});
                 document.getElementsByClassName('FlatButton--primary')[0].click();
             }
         }
     } catch (e){
-        await chrome.runtime.sendMessage({method: 'removeTab', params: {tabId: tabId}});
+        try{
+            await chrome.runtime.sendMessage({method: 'removeTab', params: {tabId: tabId}});
+        } catch (ignore) {}
+
     }
     return resp;
 }

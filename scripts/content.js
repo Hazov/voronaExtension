@@ -145,7 +145,12 @@ function getMaxSizeLinkFromOnClick(element){
 }
 
 async function sendMsgToBackground(method, params){
-    await chrome.runtime.sendMessage({method: method, params: params});
+    try{
+        await chrome.runtime.sendMessage({method: method, params: params});
+    }catch (e){
+        chrome.runtime.reload()
+    }
+
 }
 
 
