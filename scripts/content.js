@@ -12,24 +12,23 @@ chrome.runtime.onMessage.addListener(
 
 createDownloadBtnInDlg();
 
-$(document).on('scroll', () => {
+$(document).on('click', () => {
     createDownloadBtnInDlg();
 })
 
-
 function createDownloadBtnInDlg(){
     if(!document.getElementById('dwnld')){
-        let peerInfo = document.getElementsByClassName("PeerProfile__container");
+        let peerInfo = document.getElementsByClassName("ConvoUserInfoBanner__container");
         if(peerInfo && peerInfo[0]){
             peerInfo = peerInfo[0];
 
             let dt = document.createElement("dt");
-            dt.className = "PeerProfile__label";
+            dt.className = "ConvoUserInfoBannerDescription__title";
             dt.style = "padding-top: 10px;";
             dt.innerText = "Белая ворона";
 
             let dd = document.createElement("dd");
-            dd.className = "PeerProfile__content PeerProfile__tags";
+            dd.className = "ConvoUserInfoBannerDescription__conent";
 
             let button = document.createElement("button");
             button.className = "FlatButton FlatButton--primary FlatButton--size-s im-page-action _im_page_action";
@@ -58,25 +57,35 @@ function createDownloadBtnInDlg(){
 }
 
 async function onClickDownload(){
-    let selId = getSelId();
+    let userId = getUserId();
     let links = [];
-    let selectedMessages = document.getElementsByClassName("im-mess_selected");
+    let selectedMessages = $('*[class*="ConvoHistory__messageWrapper"]').filter(function() {
+        const prevElem = $(this).prev();
+        const nextElem = $(this).next();
+
+        // Проверяем предыдущего и следующего соседа
+        return (
+            prevElem.is('[class*="selectTogglerActive"]') ||
+            nextElem.is('[class*="selectTogglerActive"]')
+        );
+    });
     for (let i = 0; i < selectedMessages.length; i++) {
         links.push(...searchPhotoLinks(selectedMessages[i]));
     }
-    await sendMsgToBackground('openAndDo', {links: links, selId: selId})
+    await sendMsgToBackground('openAndDo', {links: links, selId: userId})
 }
 
-function getSelId(){
-    let selId =  document.getElementsByClassName('ui_rmenu_item_sel');
-    if(selId && selId[0] && selId[0].title){
-        return selId[0].title
-    } else {
-        selId = window.location.href;
-        selId = selId.substring(selId.indexOf('sel=') + 4);
-        if(selId.indexOf('&') !== -1){
-            return selId.substring(0, selId.indexOf('&'));
+function getUserId(){
+    let userId = 'undefined';
+    userId = $('h2.ConvoTitle__author').first().text();
+    if(!userId){
+        userId = window.location.href;
+        userId = userId.substring(userId.indexOf('convo/') + 6);
+        if(userId.indexOf('?') !== -1){
+            return userId.substring(0, userId.indexOf('?'));
         }
+    } else {
+        return userId;
     }
     return 'undefined'
 }
@@ -84,47 +93,30 @@ function getSelId(){
 function searchPhotoLinks(messElement){
     let links = [];
     links.push(...getSimpleLinks(messElement));
-    links.push(...getForwardedLinks(messElement));
     return links;
 }
 
 function getSimpleLinks(messElement){
     let links = [];
-    let gimId = getGimId(window.location.href)
-    //Обычные сообщения
-    let messId;
-    let classWithMessId = messElement.classList.values()
-        .filter(f => typeof f === 'string')
-        .find(className => className.search(/\d/) !== -1);
-    if(classWithMessId){
-        messId = classWithMessId.replaceAll(/\D/g, '');
-    }
-    if(messId){
-        let link = 'https://vk.com/' + gimId + '?act=browse_images&id=' + messId;
-        if(link){
-            links.push({href: link, isDoc: false});
+
+    $(messElement).find('.AttachPhotos__link img').each(function() {
+        let src = $(this).attr('src');
+
+        if (src && /^http[s]*?:/.test(src)) {
+            links.push({href: src, isDoc: false})
         }
-    }
+    });
+
+    $(messElement).find('.AttachDocPreview').each(function() {
+        let href = $(this).attr('href');
+
+        if (href && /^http[s]*?:/.test(href)) {
+            links.push({href: href, isDoc: true})
+        }
+    });
     return links;
 }
 
-function getForwardedLinks(messElement){
-    let links = [];
-    let fwdMessages = messElement.getElementsByClassName('im-mess--inline-fwd');
-    for (let i = 0; i < fwdMessages.length; i++) {
-        let mess = fwdMessages[i];
-        let hrefs = mess.getElementsByTagName('a');
-        for (let j = 0; j < hrefs.length; j++) {
-            let a = hrefs[j];
-            if(a.classList.toString().includes('page_post_thumb_wrap')){
-                links.push({href: getMaxSizeLinkFromOnClick(a), isDoc: false});
-            } else if(a.classList.toString().includes('page_post_thumb_unsized')){
-                links.push({href: a.href, isDoc: true});
-            }
-        }
-    }
-    return links;
-}
 
 function getGimId(href){
     let start = href.indexOf('gim');

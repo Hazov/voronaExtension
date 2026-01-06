@@ -51,11 +51,14 @@ async function openAndDo(params){
     for (let i = 0; i < links.length; i++) {
         let link = links[i];
         let newTab = await chrome.tabs.create({url: link.href, active: false, pinned: true});
-        await chrome.scripting.executeScript({
-            target : {tabId : newTab.id},
-            func : downloadAllImages,
-            args : [params.selId, newTab.id, link.isDoc, date]
-        });
+        setTimeout(async () => {
+            await chrome.scripting.executeScript({
+                target : {tabId : newTab.id},
+                func : downloadAllImages,
+                args : [params.selId, newTab.id, link.isDoc, date]
+            });
+        }, link.isDoc ? 2000 : 0)
+
     }
 }
 
@@ -65,44 +68,44 @@ function waitFwdDoc(fwdDoc){
 
 
 async function downloadAllImages(selId, tabId, isDoc, date){
-
     let folderName = selId + '__' + date;
-    try{
-        window.onload = async function(){
-            if(!isDoc){
-                let elementsByTagName = document.querySelectorAll('img');
 
-                for (let i = 0; i < elementsByTagName.length; i++) {
-                    let img = elementsByTagName[i];
-                    const src = img.src;
+    const func = async function(){
+        console.log("я туточки")
+        let elementsByTagName = document.querySelectorAll('img');
+        console.log(elementsByTagName.length)
+        for (let i = 0; i < elementsByTagName.length; i++) {
+            let img = elementsByTagName[i];
+            const src = img.src;
+            const fetchResponse = await fetch(src);
+            const blob = await fetchResponse.blob();
+            const mimeType = blob.type;
+            let link = URL.createObjectURL(blob);
+            let name = 'dfg'
 
-                    const fetchResponse = await fetch(src);
-                    const blob = await fetchResponse.blob();
-                    const mimeType = blob.type;
+            const start = src.lastIndexOf('/') + 1;
+            const end = src.indexOf('.', start);
+            name = src.substring(start, end === -1 ? undefined : end);
+            name = name.replace(/[^a-zA-Z0-9]+/g, '-');
+            name += '.' + mimeType.substring(mimeType.lastIndexOf('/') + 1);
+            let ext = name.substring(name.lastIndexOf('.'));
+            name = folderName + '\\' + name.substring(0, 10) + ext;
 
-                    const start = src.lastIndexOf('/') + 1;
-                    const end = src.indexOf('.', start);
-                    let name = src.substring(start, end === -1 ? undefined : end);
-                    name = name.replace(/[^a-zA-Z0-9]+/g, '-');
-                    name += '.' + mimeType.substring(mimeType.lastIndexOf('/') + 1);
-                    let ext = name.substring(name.lastIndexOf('.'));
-                    name = folderName + '\\' + name.substring(0, 10) + ext;
-                    let link = URL.createObjectURL(blob);
-                    await chrome.runtime.sendMessage({method: 'waitFwdDoc', params: {size: blob.size, tabId: tabId, fName: folderName}});
-                    await chrome.runtime.sendMessage({method: 'downloadLink', params: {url: URL.createObjectURL(blob), filename: name}});
-                }
-                await chrome.runtime.sendMessage({method: 'removeTab', params: {tabId: tabId}});
-            } else {
-                let fileName = document.getElementsByClassName('docs_panel_name')[0].children[0].innerHTML;
-                await chrome.runtime.sendMessage({method: 'waitFwdDoc', params: {fileName: fileName, tabId: tabId, fName: folderName}});
-                document.getElementsByClassName('FlatButton--primary')[0].click();
-            }
+            await chrome.runtime.sendMessage({method: 'waitFwdDoc', params: {size: blob.size, tabId: tabId, fName: folderName}});
+            await chrome.runtime.sendMessage({method: 'downloadLink', params: {url: link, filename: name}});
+            await chrome.runtime.sendMessage({method: 'removeTab', params: {tabId: tabId}});
         }
+    }
+
+    try{
+        if(!isDoc)
+            window.onload = func
+        else
+            await func()
     } catch (e){
         try{
             await chrome.runtime.sendMessage({method: 'removeTab', params: {tabId: tabId}});
         } catch (ignore) {}
-
     }
     return resp;
 }
